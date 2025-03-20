@@ -1,0 +1,13 @@
+[package]
+name = "proc_macro-deterministic-rand"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+proc-macro2 = { version = "1.0.94", features = ["span-locations"] }
+lccc-siphash = { git = "https://github.com/lccc-project/lccc-siphash.git", version = "0.1.0" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(procmacro2_semver_exempt)',
+] }
