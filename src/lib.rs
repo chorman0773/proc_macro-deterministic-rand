@@ -10,16 +10,21 @@ fn hash_span<H: Hasher>(span: Span, hasher: &mut H) {
     st.hash(hasher);
 }
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-const NAME: &str = env!("CARGO_PKG_NAME");
+#[derive(Hash, Copy, Clone)]
+pub struct KeySeed<'a>(&'a [&'a [u8]]);
+
+impl<'a> KeySeed<'a> {
+    pub const fn new(keys: &'a [&'a [u8]]) -> Self {
+        Self(keys)
+    }
+}
 
 const HASH_SEED_VERSION: &str = env!("HASH_SEED_VERSION");
 const HASH_KEY_TARGET: &str = env!("TARGET");
 
-fn seed_token_generator() -> SipHasher<2, 4> {
+fn seed_token_generator(key: KeySeed) -> SipHasher<2, 4> {
     let mut seed_gen = SipHasher::<2, 4>::new_with_keys(11717105939243852261, 11816760824499105823);
-    VERSION.hash(&mut seed_gen);
-    NAME.hash(&mut seed_gen);
+    key.hash(&mut seed_gen);
     HASH_SEED_VERSION.hash(&mut seed_gen);
     HASH_KEY_TARGET.hash(&mut seed_gen);
     let k0 = seed_gen.finish();
@@ -40,7 +45,11 @@ impl RandomSource {
     }
 
     pub fn with_key_span(span: Span) -> Self {
-        let mut hasher = seed_token_generator();
+        Self::with_key_span_and_seed(span, keys_from_cargo!("internal"))
+    }
+
+    pub fn with_key_span_and_seed(span: Span, keys: KeySeed) -> Self {
+        let mut hasher = seed_token_generator(keys);
         hash_span(span, &mut hasher);
 
         Self(hasher)
@@ -51,4 +60,15 @@ impl RandomSource {
 
         self.0.finish()
     }
+}
+
+#[macro_export]
+macro_rules! keys_from_cargo {
+    ($($extras:literal),*) => {
+        $crate::KeySeed::new(&[
+            ::core::env!("CARGO_PKG_NAME").as_bytes(),
+            ::core::env!("CARGO_PKG_VERSION").as_bytes(),
+            $(($extras).as_bytes()),*
+        ])
+    };
 }
